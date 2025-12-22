@@ -11,41 +11,65 @@ const frontDeskSupport = async (state) => {
             content: SYSTEM_PROMPT
         },
         ...state.messages
-    ], {
-        response_format: {
-            type: 'json_object'
-        }
-    })
+    ])
 
-    const CATEGORIZATION_SYSTEM_PROMPT = `Your are an expert customer support routing system.Your job is to detect whether a customer support representative is routing a user to a marketing team or learning support team , or if they are just responding conversationally.`
+    const assistantJson = JSON.parse(supportResponse.content);
 
-    await model.invoke([
+    const CATEGORIZATION_SYSTEM_PROMPT = `Your are an expert customer support routing system.Your job is to detect whether a customer support representative is routing a user to a marketing team or learning support team , or if they are just responding conversationally.Return a json object with key nextRepresentative which can be either learning, marketing or none.Return JSON:
+{ "nextRepresentative": "marketing" | "learning" | "none" }`
+
+    const categoryResponse = await model.invoke([
         {
             role: 'system',
             content: CATEGORIZATION_SYSTEM_PROMPT
         },
         ...state.messages,
-
-    ])
+        supportResponse,
+    ], {
+        response_format: { type: 'json_object' }
+    })
 
     console.log(supportResponse);
+    const { nextRepresentative } = JSON.parse(categoryResponse.content);
 
-    return state
+    return { ...state, messages: [...state.messages, { role: 'assistant', content: assistantJson.message }], nextRepresentative }
 }
 
 const marketingSupport = (state) => {
+    console.log('handled by marketing team')
     return state
 }
 
 const learningSupport = (state) => {
+    console.log('handled by learning team')
+
     return state
+}
+
+const getNextNode = (state) => {
+    if (state.nextRepresentative === 'marketing') {
+        return 'marketingSupport';
+    } else if (state.nextRepresentative === 'learning') {
+        return 'learningSupport';
+    } else {
+        return '__end__'
+    }
 }
 
 
 const graph = new StateGraph(StateAnnotation);
 
-graph.addNode('frontDeskSupport', frontDeskSupport).addNode('marketingSupport', marketingSupport).addNode('learningSupport', learningSupport).addEdge('__start__', 'frontDeskSupport').addEdge('frontDeskSupport', 'marketingSupport').addEdge('frontDeskSupport', 'learningSupport')
+graph.addNode('frontDeskSupport', frontDeskSupport)
+    .addNode('marketingSupport', marketingSupport)
+    .addNode('learningSupport', learningSupport)
+    .addEdge('__start__', 'frontDeskSupport')
+    .addConditionalEdges('frontDeskSupport', getNextNode)
+    .addEdge('marketingSupport', '__end__')
+    .addEdge('learningSupport', '__end__')
 
 const app = graph.compile();
 
-await app.invoke({ messages: [{ role: 'user', content: 'I want to know about pricing.' }] })
+const finalR = await app.stream({ messages: [{ role: 'user', content: 'Can i know contents of course?' }] })
+
+for await (const r of finalR)
+    console.log(r);
