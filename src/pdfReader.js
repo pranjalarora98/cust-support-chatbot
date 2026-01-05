@@ -2,11 +2,17 @@ import fs from 'fs';
 import { createRequire } from 'module';
 import { model } from './model.js';
 import { Pinecone } from '@pinecone-database/pinecone';
+import { OpenAIEmbeddings } from '@langchain/openai';
 
 import dotenv from 'dotenv';
 dotenv.config();
 
 import { PDFParse } from 'pdf-parse';
+
+export const embeddings = new OpenAIEmbeddings({
+    model: "text-embedding-3-large",
+    apiKey: process.env.OPEN_API_KEY,
+});
 
 
 const pinecone = new Pinecone({
@@ -43,7 +49,7 @@ const chunks = chunkText(text);
 console.log('Total chunks:', chunks.length);
 console.log('Sample chunk:', chunks[0].slice(0, 200));
 
-const indexName = "company-support1";
+const indexName = "cg-learning-knowledge";
 
 // await pinecone.createIndex({
 //     name: indexName,
@@ -59,17 +65,15 @@ const indexName = "company-support1";
 
 const index = pinecone.index(indexName);
 
-const embeddingResponse = await model.embedding.create({
-    model: "text-embedding-3-small",
-    input: chunks,
-});
+
+
+const embeddingsArray = await embeddings.embedDocuments(chunks);
 
 const vectors = chunks.map((chunk, i) => ({
     id: `chunk_${i}`,
-    embedding: embeddingResponse.data[i].embedding,
+    embedding: embeddingsArray[i],
     text: chunk,
 }));
-
 
 
 const pineconeVectors = vectors.map((v) => ({
