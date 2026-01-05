@@ -44,21 +44,21 @@ const frontDeskSupport = async (state) => {
 
 const marketingSupport = async (state) => {
     const llmWithTools = model.bindTools(marketingTools)
+
     console.log('marketing support called');
+
+    const SYSTEM_PROMPT = `You are part of the Marketing Team at Coder's Gyan, an ed-tech company that helps software developers excel in their careers through practical web development and Generative AI courses.
+You specialize in handling questions about promo codes, discounts, offers, and special campaigns.
+Answer clearly, concisely, and in a friendly manner. For queries outside promotions (course content, learning), politely redirect the student to the correct team.
+Important: Answer only using given context, else say I don't have enough information about it.`;
+
     const response = await llmWithTools.invoke([{
         role: 'system',
-        content: `
-You are part of the marketing team.
-
-IMPORTANT:
-You MUST call the getOffers tool to answer the user's question.
-Do NOT answer in text.
-If you do not call the tool, you are wrong.
-Make sure to call the tool.
-`
+        content: SYSTEM_PROMPT
     },
     ...state.messages
     ]);
+
     console.log('marketing tool response', response)
     return { ...state, messages: [...state.messages, response] };
 }
@@ -80,8 +80,9 @@ const getNextNode = (state) => {
 }
 
 const hasToolCall = (state) => {
-    console.log(state);
-    return 'marketingTool';
+    if (state.messages[state.messages.length - 1]?.tool_calls?.length > 0)
+        return 'marketingTool';
+    return '__end__';
 }
 
 
@@ -99,9 +100,9 @@ graph.addNode('frontDeskSupport', frontDeskSupport)
 
 const app = graph.compile();
 
-const stream = await app.stream({ messages: [{ role: 'user', content: 'Can you tell me about more discounts & offers?' }] })
+const stream = await app.stream({ messages: [{ role: 'user', content: 'Can i know more about courses?' }] })
 
-for await (const step of stream) {
-    console.log('STEP:', Object.keys(step)[0]);
-    console.log(JSON.stringify(step, null, 2));
-}
+// for await (const step of stream) {
+//     console.log('STEP:', Object.keys(step)[0]);
+//     console.log(JSON.stringify(step, null, 2));
+// }
