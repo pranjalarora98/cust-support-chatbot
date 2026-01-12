@@ -2,10 +2,13 @@ import { StateAnnotation } from "./state.js";
 import { StateGraph } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { model } from "./model.js";
-import { getOffers } from "./tools.js";
+import { getOffers, searchLearningKB } from "./tools.js";
 
 const marketingTools = [getOffers]
 const marketingToolNode = new ToolNode(marketingTools)
+
+const learningTools = [searchLearningKB]
+const learningToolNode = new ToolNode(learningTools);
 
 const frontDeskSupport = async (state) => {
     const SYSTEM_PROMPT = 'You are frontline support staff for Coder s Gyan, an ed-tech company that helps software developers excel in their careers through practical webdevelopment and Generative AI courses. be concise in your responses. You can chat with students and help them with basic questions, but if the student is having a marketing or learning support query, do not try to answer the question directly or gather information. Instead, immediately transfer them to the marketing team(promo codes, discounts, offers, and special campaigns) or learning support team(courses, syllabus coverage, learning paths, and study strategies) by asking the user to hold for a moment. Otherwise, just respond conversationally.You must respond in json'
@@ -63,10 +66,27 @@ Important: Answer only using given context, else say I don't have enough informa
     return { ...state, messages: [...state.messages, response] };
 }
 
-const learningSupport = (state) => {
-    console.log('handled by learning team')
+const learningSupport = async (state) => {
+    const SYSTEM_PROMPT = `You are part of the Learning Support Team at Coder's Gyan, an ed-tech company that helps software developers excel in their careers through practical web development and Generative AI courses.
+You assist students with questions about available courses, syllabus coverage, learning paths, and study strategies.
+Keep your answers concise, clear, and supportive. Strictly use information from retrived context for answering queries. If the query is about learning issues, politely redirect the student to the respective team.
+Important: Call retrieve_learning_knowledge_base max 3 times if the tool result is not relevant to original query.`;
 
-    return state
+    console.log('learning support called');
+
+    const llmWithTools = model.bindTools(learningTools);
+
+    const response = await llmWithTools.invoke([{
+        role: 'system',
+        content: SYSTEM_PROMPT
+    },
+    ...state.messages
+    ])
+
+
+    console.log('learning tool response', response)
+
+    return { ...state, messages: [...state.messages, response] };
 }
 
 const getNextNode = (state) => {
@@ -80,9 +100,15 @@ const getNextNode = (state) => {
 }
 
 const hasToolCall = (state) => {
-    if (state.messages[state.messages.length - 1]?.tool_calls?.length > 0)
-        return 'marketingTool';
-    return '__end__';
+    const lastMessage = state.messages[state.messages.length - 1];
+    if (lastMessage?.tool_calls?.length > 0) {
+        return "learningTool";
+    }
+
+    return "__end__";
+    // if (state.messages[state.messages.length - 1]?.tool_calls?.length > 0)
+    //     return 'marketingTool';
+    // return '__end__';
 }
 
 
@@ -92,15 +118,16 @@ graph.addNode('frontDeskSupport', frontDeskSupport)
     .addNode('marketingSupport', marketingSupport)
     .addNode('marketingTool', marketingToolNode)
     .addNode('learningSupport', learningSupport)
+    .addNode('learningTool', learningToolNode)
     .addEdge('__start__', 'frontDeskSupport')
     .addConditionalEdges('frontDeskSupport', getNextNode)
     .addConditionalEdges('marketingSupport', hasToolCall)
-    .addEdge('learningSupport', '__end__')
+    .addConditionalEdges('learningSupport', hasToolCall)
     .addEdge('marketingTool', '__end__');
 
 const app = graph.compile();
 
-const stream = await app.stream({ messages: [{ role: 'user', content: 'Can i know more about courses?' }] })
+const stream = await app.stream({ messages: [{ role: 'user', content: 'Can i know how codergyan syllabus?' }] })
 
 // for await (const step of stream) {
 //     console.log('STEP:', Object.keys(step)[0]);

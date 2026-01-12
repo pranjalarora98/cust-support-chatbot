@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { createRequire } from 'module';
 import { model } from './model.js';
+import { PineconeStore } from "@langchain/pinecone";
 import { Pinecone } from '@pinecone-database/pinecone';
 import { HuggingFaceInferenceEmbeddings } from "@langchain/community/embeddings/hf";
 
@@ -19,6 +20,11 @@ export const embeddings = new HuggingFaceInferenceEmbeddings({
 
 const pinecone = new Pinecone({
     apiKey: process.env.PINECONE_API_KEY,
+});
+
+export const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+    pineconeIndex: 'hugging-index',
+    maxConcurrency: 5,
 });
 
 
