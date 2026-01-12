@@ -70,7 +70,7 @@ const learningSupport = async (state) => {
     const SYSTEM_PROMPT = `You are part of the Learning Support Team at Coder's Gyan, an ed-tech company that helps software developers excel in their careers through practical web development and Generative AI courses.
 You assist students with questions about available courses, syllabus coverage, learning paths, and study strategies.
 Keep your answers concise, clear, and supportive. Strictly use information from retrived context for answering queries. If the query is about learning issues, politely redirect the student to the respective team.
-Important: Call retrieve_learning_knowledge_base max 3 times if the tool result is not relevant to original query.`;
+Important: Call searchLearningKB max 3 times if the tool result is not relevant to original query.`;
 
     console.log('learning support called');
 
@@ -99,18 +99,17 @@ const getNextNode = (state) => {
     }
 }
 
-const hasToolCall = (state) => {
-    const lastMessage = state.messages[state.messages.length - 1];
-    if (lastMessage?.tool_calls?.length > 0) {
-        return "learningTool";
-    }
-
-    return "__end__";
-    // if (state.messages[state.messages.length - 1]?.tool_calls?.length > 0)
-    //     return 'marketingTool';
-    // return '__end__';
+const hasMarketingToolCall = (state) => {
+    if (state.messages[state.messages.length - 1]?.tool_calls?.length > 0)
+        return 'marketingTool';
+    return '__end__';
 }
 
+const hasLearningToolCall = (state) => {
+    if (state.messages[state.messages.length - 1]?.tool_calls?.length > 0)
+        return 'learningTool';
+    return '__end__';
+}
 
 const graph = new StateGraph(StateAnnotation);
 
@@ -121,15 +120,16 @@ graph.addNode('frontDeskSupport', frontDeskSupport)
     .addNode('learningTool', learningToolNode)
     .addEdge('__start__', 'frontDeskSupport')
     .addConditionalEdges('frontDeskSupport', getNextNode)
-    .addConditionalEdges('marketingSupport', hasToolCall)
-    .addConditionalEdges('learningSupport', hasToolCall)
-    .addEdge('marketingTool', '__end__');
+    .addConditionalEdges('marketingSupport', hasMarketingToolCall)
+    .addConditionalEdges('learningSupport', hasLearningToolCall)
+    .addEdge('marketingTool', '__end__')
+    .addEdge('learningTool', '__end__');;
 
 const app = graph.compile();
 
-const stream = await app.stream({ messages: [{ role: 'user', content: 'Can i know how codergyan syllabus?' }] })
+const stream = await app.stream({ messages: [{ role: 'user', content: 'Can i know mission of Codersgyaan?' }] })
 
-// for await (const step of stream) {
-//     console.log('STEP:', Object.keys(step)[0]);
-//     console.log(JSON.stringify(step, null, 2));
-// }
+for await (const step of stream) {
+    console.log('STEP:', Object.keys(step)[0]);
+    console.log(JSON.stringify(step, null, 2));
+}

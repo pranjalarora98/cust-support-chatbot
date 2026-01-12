@@ -21,9 +21,10 @@ export const embeddings = new HuggingFaceInferenceEmbeddings({
 const pinecone = new Pinecone({
     apiKey: process.env.PINECONE_API_KEY,
 });
+const index = pinecone.index("hugging-index");
 
 export const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
-    pineconeIndex: 'hugging-index',
+    pineconeIndex: index,
     maxConcurrency: 5,
 });
 
@@ -54,8 +55,8 @@ function chunkText(text, chunkSize = 800, overlap = 100) {
 const text = await extractTextFromPDF('./cg-knowledge-base.pdf');
 
 const chunks = chunkText(text);
-console.log('Total chunks:', chunks.length);
-console.log('Sample chunk:', chunks[0].slice(0, 200));
+// console.log('Total chunks:', chunks.length);
+// console.log('Sample chunk:', chunks[0].slice(0, 200));
 
 const indexName = "hugging-index";
 
@@ -71,7 +72,7 @@ const indexName = "hugging-index";
 //     },
 // });
 
-const index = pinecone.index(indexName);
+// const index = pinecone.index(indexName);
 
 
 // const vec = await embeddings.embedQuery("hello world");
