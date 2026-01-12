@@ -2,17 +2,19 @@ import fs from 'fs';
 import { createRequire } from 'module';
 import { model } from './model.js';
 import { Pinecone } from '@pinecone-database/pinecone';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { HuggingFaceInferenceEmbeddings } from "@langchain/community/embeddings/hf";
+
 
 import dotenv from 'dotenv';
 dotenv.config();
 
 import { PDFParse } from 'pdf-parse';
 
-export const embeddings = new OpenAIEmbeddings({
-    model: "text-embedding-3-large",
-    apiKey: process.env.OPEN_API_KEY,
+export const embeddings = new HuggingFaceInferenceEmbeddings({
+    model: "sentence-transformers/all-MiniLM-L6-v2",
+    apiKey: process.env.HF_API_KEY,
 });
+
 
 
 const pinecone = new Pinecone({
@@ -49,7 +51,7 @@ const chunks = chunkText(text);
 console.log('Total chunks:', chunks.length);
 console.log('Sample chunk:', chunks[0].slice(0, 200));
 
-const indexName = "cg-learning-knowledge";
+const indexName = "hugging-index";
 
 // await pinecone.createIndex({
 //     name: indexName,
@@ -66,23 +68,38 @@ const indexName = "cg-learning-knowledge";
 const index = pinecone.index(indexName);
 
 
+// const vec = await embeddings.embedQuery("hello world");
+// console.log(vec.length);
 
 const embeddingsArray = await embeddings.embedDocuments(chunks);
 
-const vectors = chunks.map((chunk, i) => ({
+const pineconeVectors = chunks.map((chunk, i) => ({
     id: `chunk_${i}`,
-    embedding: embeddingsArray[i],
-    text: chunk,
-}));
-
-
-const pineconeVectors = vectors.map((v) => ({
-    id: v.id,
-    values: v.embedding,
+    values: embeddingsArray[i],
     metadata: {
-        text: v.text,
+        text: chunk,
         source: "cg-knowledge-base.pdf",
     },
 }));
 
 await index.upsert(pineconeVectors);
+
+// const embeddingsArray = await embeddings.embedDocuments(chunks);
+
+// const vectors = chunks.map((chunk, i) => ({
+//     id: `chunk_${i}`,
+//     embedding: embeddingsArray[i],
+//     text: chunk,
+// }));
+
+
+// const pineconeVectors = vectors.map((v) => ({
+//     id: v.id,
+//     values: v.embedding,
+//     metadata: {
+//         text: v.text,
+//         source: "cg-knowledge-base.pdf",
+//     },
+// }));
+
+// await index.upsert(pineconeVectors);
